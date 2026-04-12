@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Previous Items By Client</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>Previous Items By Client</h1>
+      <p>Packaging client consumption (order vs delivery basis). Last two result sets shown side by side.</p>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="tabs primary-tabs" role="tablist" aria-label="Basis">
+          <button type="button" id="tab-order" class="tab active" role="tab" aria-selected="true" data-basis="O">Order wise</button>
+          <button type="button" id="tab-delivery" class="tab" role="tab" aria-selected="false" data-basis="D">Delivery wise</button>
+        </div>
+
+        <div class="toolbar toolbar-global filter-row">
+          <label>
+            Database
+            <select id="database">
+              <option value="KOL">KOL</option>
+              <option value="AHM">AHM</option>
+            </select>
+          </label>
+          <label class="field-clients">
+            Clients
+            <div class="client-dropdown" id="client-dropdown">
+              <button type="button" class="dropdown-trigger" id="client-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span id="client-dropdown-label">Select clients…</span>
+                <span class="dropdown-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="dropdown-panel hidden" id="client-dropdown-panel" role="listbox" aria-multiselectable="true">
+                <input type="search" id="client-filter" class="dropdown-filter" placeholder="Filter by name or ID…" autocomplete="off" aria-label="Filter clients">
+                <div class="dropdown-actions">
+                  <button type="button" class="link-btn" id="client-select-all">Select visible</button>
+                  <button type="button" class="link-btn" id="client-clear-all">Clear all</button>
+                </div>
+                <div class="dropdown-list" id="client-checkbox-list"></div>
+              </div>
+            </div>
+          </label>
+          <label>
+            Top / period
+            <select id="top-filter">
+              <option value="top50" selected>Top 50</option>
+              <option value="top100">Top 100</option>
+              <option value="all6months">All (last 6 months)</option>
+            </select>
+          </label>
+          <button type="button" id="btn-search">Search</button>
+        </div>
+
+        <p id="status" class="status" role="status"></p>
+
+        <div class="results-grid">
+          <div class="table-panel">
+            <h2 class="table-title">SKU-wise client consumption</h2>
+            <div class="table-wrap">
+              <table class="data-table" id="table-left">
+                <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="table-panel">
+            <h2 class="table-title">Product category-wise consumption</h2>
+            <div class="table-wrap">
+              <table class="data-table" id="table-right">
+                <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="table-actions">
+              <button type="button" id="btn-analyze-ai" class="btn-analyze">Analyze with AI</button>
+            </div>
+          </div>
+        </div>
+
+        <section class="analysis-panel" id="analysis-panel">
+          <h3>AI consumption projection insights</h3>
+          <div id="analysis-content" class="analysis-content">Run search, then click “Analyze with AI” to get future stock consumption projection and key highlights.</div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
