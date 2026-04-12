@@ -221,6 +221,7 @@
 
     const columns = spec?.columns || [];
     const rows = spec?.rows || [];
+    const displayNames = spec?.columnDisplayNames || null;
 
     thead.innerHTML = '';
     tbody.innerHTML = '';
@@ -236,10 +237,23 @@
       return;
     }
 
+    function headerForColumn(col) {
+      if (displayNames && typeof displayNames === 'object') {
+        const dn = displayNames[col];
+        if (dn != null && String(dn).trim() !== '') return String(dn);
+        const lower = String(col).toLowerCase();
+        const key = Object.keys(displayNames).find((k) => k.toLowerCase() === lower);
+        if (key != null && displayNames[key] != null && String(displayNames[key]).trim() !== '') {
+          return String(displayNames[key]);
+        }
+      }
+      return col;
+    }
+
     const hr = document.createElement('tr');
     for (const col of columns) {
       const th = document.createElement('th');
-      th.textContent = col;
+      th.textContent = headerForColumn(col);
       hr.appendChild(th);
     }
     thead.appendChild(hr);
@@ -289,6 +303,10 @@
       latestLeftTable = {
         columns: Array.isArray(data.leftTable?.columns) ? data.leftTable.columns : [],
         rows: Array.isArray(data.leftTable?.rows) ? data.leftTable.rows : [],
+        ...(data.leftTable?.columnDisplayNames &&
+        typeof data.leftTable.columnDisplayNames === 'object'
+          ? { columnDisplayNames: data.leftTable.columnDisplayNames }
+          : {}),
       };
       latestRightTable = {
         columns: Array.isArray(data.rightTable?.columns) ? data.rightTable.columns : [],
