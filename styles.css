@@ -84,6 +84,39 @@ button {
   background: #1d4ed8;
   border-color: #1d4ed8;
   font-weight: 600;
+  position: relative;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+button.is-loading:disabled {
+  opacity: 0.95;
+  cursor: wait;
+}
+
+button.is-loading {
+  padding-left: 32px;
+}
+
+button.is-loading::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .btn-secondary {
@@ -94,9 +127,35 @@ button {
 
 .filter-row {
   display: grid;
-  grid-template-columns: 120px minmax(280px, 1.2fr) minmax(160px, 220px) 120px;
+  grid-template-columns: 120px minmax(280px, 1.2fr) minmax(160px, 220px) auto;
   gap: 10px;
   align-items: end;
+}
+
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.toolbar-actions button {
+  white-space: nowrap;
+}
+
+#btn-search {
+  min-width: 118px;
+}
+
+.btn-export {
+  background: #15803d;
+  border-color: #15803d;
+  min-width: 148px;
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #16a34a;
+  border-color: #16a34a;
 }
 
 .field-clients {
@@ -240,11 +299,44 @@ kbd {
 
 .status.error { color: #fca5a5; }
 
+.results-area {
+  position: relative;
+  margin-top: 4px;
+}
+
+.results-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+.results-loading.hidden {
+  display: none;
+}
+
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid rgba(147, 197, 253, 0.25);
+  border-top-color: #93c5fd;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
 .results-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-top: 4px;
 }
 
 .table-panel {
@@ -341,6 +433,10 @@ kbd {
   .filter-row {
     grid-template-columns: 1fr 1fr;
   }
+
+  .toolbar-actions {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 900px) {
@@ -348,8 +444,12 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .filter-row button#btn-search {
+  .toolbar-actions {
     width: 100%;
+  }
+
+  .toolbar-actions button {
+    flex: 1;
   }
 
   .results-grid {

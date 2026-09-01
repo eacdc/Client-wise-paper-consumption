@@ -53,31 +53,48 @@
               <option value="all6months">All (last 6 months)</option>
             </select>
           </label>
-          <button type="button" id="btn-search">Search</button>
+          <div class="toolbar-actions">
+            <button type="button" id="btn-search">Search</button>
+            <button
+              type="button"
+              id="btn-export-excel"
+              class="btn-export"
+              disabled
+              title="Run search first to export both tables"
+            >
+              Export to Excel
+            </button>
+          </div>
         </div>
 
         <p id="status" class="status" role="status"></p>
 
-        <div class="results-grid">
-          <div class="table-panel">
-            <h2 class="table-title">SKU-wise client consumption</h2>
-            <div class="table-wrap">
-              <table class="data-table" id="table-left">
-                <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
-                <tbody></tbody>
-              </table>
-            </div>
+        <div class="results-area" id="results-area">
+          <div class="results-loading hidden" id="results-loading" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <span>Searching, please wait…</span>
           </div>
-          <div class="table-panel">
-            <h2 class="table-title">Product category-wise consumption</h2>
-            <div class="table-wrap">
-              <table class="data-table" id="table-right">
-                <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
-                <tbody></tbody>
-              </table>
+          <div class="results-grid">
+            <div class="table-panel">
+              <h2 class="table-title">SKU-wise client consumption</h2>
+              <div class="table-wrap">
+                <table class="data-table" id="table-left">
+                  <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
-            <div class="table-actions">
-              <button type="button" id="btn-analyze-ai" class="btn-analyze">Analyze with AI</button>
+            <div class="table-panel">
+              <h2 class="table-title">Product category-wise consumption</h2>
+              <div class="table-wrap">
+                <table class="data-table" id="table-right">
+                  <thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="table-actions">
+                <button type="button" id="btn-analyze-ai" class="btn-analyze">Analyze with AI</button>
+              </div>
             </div>
           </div>
         </div>
@@ -90,6 +107,7 @@
     </main>
   </div>
 
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

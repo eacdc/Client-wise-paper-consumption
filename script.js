@@ -1,14 +1,28 @@
 (function () {
   'use strict';
 
+  // file:// (double-click / start index.html) has an empty hostname — treat as local.
   const isLocalHost =
-    typeof window !== 'undefined' && /localhost|127\.0\.0\.1/i.test(window.location.hostname);
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'file:' ||
+      !window.location.hostname ||
+      /localhost|127\.0\.0\.1|^::1$/i.test(window.location.hostname));
   const API_BASE = isLocalHost ? 'http://localhost:3001/api' : 'https://cdcapi.onrender.com/api';
 
   /** @type {{ ledgerId: number, ledgerName: string }[]} */
   let clientsCache = [];
   let latestLeftTable = { columns: [], rows: [] };
   let latestRightTable = { columns: [], rows: [] };
+  let lastSearchOk = false;
+  let searchBusy = false;
+  let analyzeBusy = false;
+
+  const SEARCH_IDLE = 'Search';
+  const SEARCH_LOADING = 'Searching…';
+  const ANALYZE_IDLE = 'Analyze with AI';
+  const ANALYZE_LOADING = 'Analyzing…';
+  const EXPORT_IDLE = 'Export to Excel';
+  const EXPORT_LOADING = 'Exporting…';
 
   const els = {
     tabOrder: document.getElementById('tab-order'),
@@ -23,11 +37,13 @@
     clientClearAll: document.getElementById('client-clear-all'),
     topFilter: document.getElementById('top-filter'),
     btnSearch: document.getElementById('btn-search'),
+    btnExport: document.getElementById('btn-export-excel'),
     btnAnalyzeAi: document.getElementById('btn-analyze-ai'),
     status: document.getElementById('status'),
     analysisContent: document.getElementById('analysis-content'),
     tableLeft: document.getElementById('table-left'),
     tableRight: document.getElementById('table-right'),
+    resultsLoading: document.getElementById('results-loading'),
   };
 
   let currentBasis = 'O';
@@ -44,13 +60,60 @@
     return currentBasis;
   }
 
+  function setButtonLoading(btn, isLoading, idleText, loadingText) {
+    if (!btn) return;
+    btn.classList.toggle('is-loading', Boolean(isLoading));
+    btn.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    btn.textContent = isLoading ? loadingText : idleText;
+  }
+
+  function updateActionButtons() {
+    const lock = searchBusy || analyzeBusy;
+    if (els.btnSearch) {
+      els.btnSearch.disabled = lock;
+      if (!searchBusy) setButtonLoading(els.btnSearch, false, SEARCH_IDLE, SEARCH_LOADING);
+    }
+    if (els.btnAnalyzeAi) {
+      els.btnAnalyzeAi.disabled = lock;
+      if (!analyzeBusy) setButtonLoading(els.btnAnalyzeAi, false, ANALYZE_IDLE, ANALYZE_LOADING);
+    }
+    if (els.btnExport) {
+      const canExport = lastSearchOk && !lock;
+      els.btnExport.disabled = !canExport;
+      els.btnExport.title = lastSearchOk
+        ? 'Export SKU-wise and category-wise tables to Excel'
+        : 'Run search first to export both tables';
+    }
+  }
+
+  function setSearchLoading(isLoading) {
+    searchBusy = Boolean(isLoading);
+    if (els.resultsLoading) {
+      els.resultsLoading.classList.toggle('hidden', !isLoading);
+    }
+    if (els.btnSearch) {
+      setButtonLoading(els.btnSearch, isLoading, SEARCH_IDLE, SEARCH_LOADING);
+    }
+    updateActionButtons();
+  }
+
+  function setAnalyzeLoading(isLoading) {
+    analyzeBusy = Boolean(isLoading);
+    if (els.btnAnalyzeAi) {
+      setButtonLoading(els.btnAnalyzeAi, isLoading, ANALYZE_IDLE, ANALYZE_LOADING);
+    }
+    updateActionButtons();
+  }
+
   function resetTablesToPlaceholder() {
     latestLeftTable = { columns: [], rows: [] };
     latestRightTable = { columns: [], rows: [] };
+    lastSearchOk = false;
     const placeholder =
       '<thead><tr><th class="empty-cell">Run search to load data.</th></tr></thead><tbody></tbody>';
     if (els.tableLeft) els.tableLeft.innerHTML = placeholder;
     if (els.tableRight) els.tableRight.innerHTML = placeholder;
+    updateActionButtons();
   }
 
   /** Clear tables, client checkboxes, and analysis when Order ↔ Delivery changes. */
@@ -208,6 +271,33 @@
     return String(val);
   }
 
+  function toExcelValue(val) {
+    if (val == null) return '';
+    if (typeof val === 'number') return Number.isFinite(val) ? val : '';
+    if (typeof val === 'boolean') return val;
+    if (val instanceof Date) return val;
+    if (typeof val === 'object') return formatCell(val);
+    return val;
+  }
+
+  function headerForColumn(col, displayNames) {
+    if (displayNames && typeof displayNames === 'object') {
+      const dn = displayNames[col];
+      if (dn != null && String(dn).trim() !== '') return String(dn);
+      const lower = String(col).toLowerCase();
+      const key = Object.keys(displayNames).find((k) => k.toLowerCase() === lower);
+      if (key != null && displayNames[key] != null && String(displayNames[key]).trim() !== '') {
+        return String(displayNames[key]);
+      }
+    }
+    // Fallback: make DB-style names friendlier (PaperCutSize -> Paper Cut Size).
+    return String(col)
+      .replace(/_/g, ' ')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function setAnalysis(text) {
     if (!els.analysisContent) return;
     els.analysisContent.textContent = text || '';
@@ -237,23 +327,10 @@
       return;
     }
 
-    function headerForColumn(col) {
-      if (displayNames && typeof displayNames === 'object') {
-        const dn = displayNames[col];
-        if (dn != null && String(dn).trim() !== '') return String(dn);
-        const lower = String(col).toLowerCase();
-        const key = Object.keys(displayNames).find((k) => k.toLowerCase() === lower);
-        if (key != null && displayNames[key] != null && String(displayNames[key]).trim() !== '') {
-          return String(displayNames[key]);
-        }
-      }
-      return col;
-    }
-
     const hr = document.createElement('tr');
     for (const col of columns) {
       const th = document.createElement('th');
-      th.textContent = headerForColumn(col);
+      th.textContent = headerForColumn(col, displayNames);
       hr.appendChild(th);
     }
     thead.appendChild(hr);
@@ -270,7 +347,64 @@
     }
   }
 
+  function tableToSheet(spec, emptyLabel) {
+    const columns = spec?.columns || [];
+    const rows = spec?.rows || [];
+    const displayNames = spec?.columnDisplayNames || null;
+    if (!columns.length) {
+      return window.XLSX.utils.aoa_to_sheet([[emptyLabel], ['No data']]);
+    }
+    const headers = columns.map((col) => headerForColumn(col, displayNames));
+    const body = rows.map((row) => columns.map((col) => toExcelValue(row[col])));
+    return window.XLSX.utils.aoa_to_sheet([headers, ...body]);
+  }
+
+  function exportToExcel() {
+    if (searchBusy || analyzeBusy) return;
+    if (!lastSearchOk) {
+      setStatus('Run search first to export.', true);
+      return;
+    }
+    if (typeof window.XLSX === 'undefined') {
+      setStatus('Excel export library failed to load. Check your internet connection and try again.', true);
+      return;
+    }
+
+    if (els.btnExport) {
+      els.btnExport.disabled = true;
+      setButtonLoading(els.btnExport, true, EXPORT_IDLE, EXPORT_LOADING);
+    }
+
+    try {
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(
+        wb,
+        tableToSheet(latestLeftTable, 'SKU-wise client consumption'),
+        'SKU-wise consumption'
+      );
+      window.XLSX.utils.book_append_sheet(
+        wb,
+        tableToSheet(latestRightTable, 'Product category-wise consumption'),
+        'Category-wise consumption'
+      );
+      const db = els.database?.value || 'KOL';
+      const basis = getBasis() === 'D' ? 'Delivery' : 'Order';
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      window.XLSX.writeFile(wb, `Previous_Items_By_Client_${db}_${basis}_${stamp}.xlsx`);
+      setStatus('Excel file downloaded (SKU-wise and category-wise sheets).', false);
+    } catch (e) {
+      console.error(e);
+      setStatus(e.message || 'Excel export failed', true);
+    } finally {
+      if (els.btnExport) {
+        setButtonLoading(els.btnExport, false, EXPORT_IDLE, EXPORT_LOADING);
+      }
+      updateActionButtons();
+    }
+  }
+
   async function runSearch() {
+    if (searchBusy) return;
     const db = els.database?.value || 'KOL';
     const ledgerIds = selectedLedgerIds();
     if (!ledgerIds.length) {
@@ -281,8 +415,8 @@
     const topFilter = els.topFilter?.value || 'top50';
     const basis = getBasis();
 
-    setStatus('Searching…');
-    els.btnSearch && (els.btnSearch.disabled = true);
+    setStatus('Searching… this can take a moment.');
+    setSearchLoading(true);
 
     try {
       const res = await fetch(`${API_BASE}/previousitemsbyclient/search`, {
@@ -314,19 +448,22 @@
       };
       renderTable(els.tableLeft, latestLeftTable);
       renderTable(els.tableRight, latestRightTable);
+      lastSearchOk = true;
       const lr = (data.leftTable?.rows || []).length;
       const rr = (data.rightTable?.rows || []).length;
       setAnalysis('Click “Analyze with AI” for projection and highlights.');
       setStatus(`Done. Left table: ${lr} row(s), right table: ${rr} row(s).`);
     } catch (e) {
       console.error(e);
+      lastSearchOk = false;
       setStatus(e.message || 'Search failed', true);
     } finally {
-      els.btnSearch && (els.btnSearch.disabled = false);
+      setSearchLoading(false);
     }
   }
 
   async function analyzeWithAi() {
+    if (analyzeBusy || searchBusy) return;
     const db = els.database?.value || 'KOL';
     const ledgerIds = selectedLedgerIds();
     if (!ledgerIds.length) {
@@ -344,9 +481,9 @@
       .filter((c) => ledgerIds.includes(c.ledgerId))
       .map((c) => c.ledgerName);
 
-    setStatus('Running AI analysis...', false);
+    setStatus('Running AI analysis…', false);
     setAnalysis('Analyzing both tables with AI. Please wait...');
-    if (els.btnAnalyzeAi) els.btnAnalyzeAi.disabled = true;
+    setAnalyzeLoading(true);
 
     try {
       const res = await fetch(`${API_BASE}/previousitemsbyclient/analyze`, {
@@ -373,7 +510,7 @@
       setAnalysis(`AI analysis failed: ${e.message || 'Unknown error'}`);
       setStatus(e.message || 'AI analysis failed', true);
     } finally {
-      if (els.btnAnalyzeAi) els.btnAnalyzeAi.disabled = false;
+      setAnalyzeLoading(false);
     }
   }
 
@@ -419,8 +556,14 @@
   });
 
   // Events
-  els.tabOrder?.addEventListener('click', () => setPrimaryTab('order'));
-  els.tabDelivery?.addEventListener('click', () => setPrimaryTab('delivery'));
+  els.tabOrder?.addEventListener('click', () => {
+    if (searchBusy || analyzeBusy) return;
+    setPrimaryTab('order');
+  });
+  els.tabDelivery?.addEventListener('click', () => {
+    if (searchBusy || analyzeBusy) return;
+    setPrimaryTab('delivery');
+  });
 
   els.database?.addEventListener('change', () => {
     clientsCache = [];
@@ -429,6 +572,7 @@
   });
 
   els.btnSearch?.addEventListener('click', () => runSearch());
+  els.btnExport?.addEventListener('click', () => exportToExcel());
   els.btnAnalyzeAi?.addEventListener('click', () => analyzeWithAi());
   els.topFilter?.addEventListener('change', () => {
     if (selectedLedgerIds().length) {
@@ -438,5 +582,6 @@
 
   setPrimaryTab('order');
   if (els.topFilter) els.topFilter.value = 'top50';
+  updateActionButtons();
   setAnalysis('Run search, then click “Analyze with AI” to get future stock consumption projection and key highlights.');
 })();
